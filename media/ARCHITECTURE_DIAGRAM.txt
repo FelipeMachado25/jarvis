@@ -1,0 +1,44 @@
+        JARVIS — 100% LOCAL PERSONAL ASSISTANT
+        ========================================
+
+            ┌───────────────────────────┐
+            │            YOU            │
+            │   python3 runners/x.py    │
+            └─────────────┬─────────────┘
+                          │
+                          ▼
+            ┌───────────────────────────┐
+            │        runners/*.py       │   thin CLI entry points
+            │  search finance projects  │
+            │      ideas weekly chat     │
+            └─────────────┬─────────────┘
+                          │
+                          ▼
+            ┌───────────────────────────┐
+            │   core/orchestrator.py    │   runs agents · logs ·
+            │                           │   isolates failures
+            └─────────────┬─────────────┘
+                          │
+                          ▼
+            ┌───────────────────────────┐
+            │        agents/*.py        │   the intelligence
+            └───────┬───────────┬───────┘
+                    │           │
+        reads/writes│           │reasoning
+                    ▼           ▼
+      ┌──────────────────┐  ┌──────────────────────┐
+      │  core/vault.py   │  │ core/model_client.py │
+      │  markdown  I/O   │  │  ONLY talks to        │
+      └────────┬─────────┘  │  localhost:11434      │
+               │            └───────────┬──────────┘
+               ▼                        ▼
+     ┌───────────────────┐   ┌────────────────────────┐
+     │  ~/Obsidian vault │   │  Ollama → mistral:7b   │
+     │  (markdown files) │   │  Apple Silicon GPU     │
+     └───────────────────┘   │  fully offline         │
+                             └────────────────────────┘
+
+     ~/.jarvis/config.json ──► core/config.py
+       (vault path · user name · folders — the only thing you edit)
+
+     NO CLOUD  ·  NO API KEYS  ·  NO DEPENDENCIES  ·  WORKS OFFLINE

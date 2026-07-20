@@ -1,0 +1,8 @@
+{
+  "_comment": "Copy this to ~/.jarvis/config.json and edit. Jarvis is 100% local — there are NO API keys or accounts anywhere. Nothing to paste, nothing to leak.",
+  "vault": "~/Obsidian/Vault",
+  "user_name": "Your Name",
+  "carpetas": ["Finance", "Projects", "Ideas", "Learning", "Prompts", "Weekly"],
+  "briefing_semanal": { "dia": "domingo", "hora": "20:00" },
+  "log_level": "INFO"
+}
