@@ -1,0 +1,2 @@
+# Jarvis no tiene dependencias externas: todo usa la librería estándar
+# de Python 3 (urllib para hablar con Ollama). No hace falta pip install.
