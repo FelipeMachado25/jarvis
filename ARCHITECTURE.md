@@ -88,6 +88,19 @@ every Sunday at 20:00. `startup_ollama.sh` guarantees the model is up before
 any scheduled run. `trigger.sh` is the entry point `launchd` actually calls.
 `launchd` is used instead of `cron` because it survives reboots and sleep.
 
+## The Jarvis tab (`runners/web.py`)
+
+```
+browser tab (web/index.html: voice, wake word, panels)
+   └─► runners/web.py  (stdlib http.server, 127.0.0.1 only)
+         └─► core/asistente.py  (intent → action)
+               ├─► agents/pendientes.py ─► core/sources/{tareas,agenda,correo}.py
+               ├─► orchestrator (finance · projects · ideas · weekly · search)
+               └─► brain: core/openjarvis_bridge.py (if `jarvis serve` is up) or Ollama
+```
+
+Details and setup: [JARVIS_TAB.md](JARVIS_TAB.md).
+
 ## How agents communicate
 
 They don't talk to each other directly. Coordination is through two shared,
@@ -117,7 +130,9 @@ weekly.run()
 
 ## Design principles
 
-- **Local-first, always.** No component may reach beyond `localhost`.
+- **Local-first, always.** The model only ever runs on `localhost`. The only
+  outbound connections are the opt-in personal sources (IMAP to your mail
+  provider, your calendar's `.ics`), which fetch *your* data *to* your machine.
 - **Zero dependencies.** Standard library only. This is a feature, not a limitation.
 - **Fail soft.** A missing model or empty folder produces a helpful message, not a stack trace.
 - **Files over state.** The vault is the database. Everything is inspectable markdown.

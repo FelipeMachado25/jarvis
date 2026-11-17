@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jarvis</title>
+<style>
+  :root {
+    --bg: #05080d; --panel: #0b121b; --panel-2: #0f1925; --line: #1b2a3a;
+    --text: #d9e6f2; --muted: #7d93a8; --accent: #3ad6ff; --accent-2: #1e88b8;
+    --ok: #3ddc97; --warn: #ffb84d; --bad: #ff5d6c;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #eef3f8; --panel: #ffffff; --panel-2: #f5f8fb; --line: #d6e0ea;
+      --text: #0f1b27; --muted: #5a6f83; --accent: #0a84b8; --accent-2: #0a6a94;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(1200px 600px at 50% -10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%), var(--bg);
+    color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  }
+  .app { display: grid; grid-template-columns: 340px 1fr 340px; gap: 16px; padding: 16px; height: 100vh; }
+  @media (max-width: 1100px) { .app { grid-template-columns: 1fr; height: auto; } .side { order: 2; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .side { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+  .side .card { overflow: auto; min-height: 120px; }
+  .side .card.grow { flex: 1; }
+  h2 { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; display: flex; justify-content: space-between; align-items: center; }
+  h2 .count { font-family: var(--mono); color: var(--accent); letter-spacing: 0; }
+  .center { display: flex; flex-direction: column; min-height: 0; gap: 12px; }
+  .hud { display: flex; flex-direction: column; align-items: center; padding: 18px 0 6px; }
+  .orb { width: 128px; height: 128px; border-radius: 50%; border: 0; cursor: pointer; position: relative;
+    background: radial-gradient(circle at 50% 50%, #fff 0 6%, var(--accent) 14%, color-mix(in srgb, var(--accent) 35%, transparent) 38%, transparent 62%);
+    box-shadow: 0 0 40px color-mix(in srgb, var(--accent) 45%, transparent), inset 0 0 30px color-mix(in srgb, var(--accent) 40%, transparent);
+    transition: transform .2s; }
+  .orb::before, .orb::after { content: ""; position: absolute; inset: -10px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); border-left-color: transparent; border-right-color: transparent; animation: spin 8s linear infinite; }
+  .orb::after { inset: -22px; border-width: 1px; animation-duration: 14s; animation-direction: reverse; }
+  .orb:hover { transform: scale(1.04); }
+  .orb.listening { animation: pulse 1.1s ease-in-out infinite; }
+  .orb.listening::before { animation-duration: 2s; }
+  .orb.thinking::before { animation-duration: .8s; }
+  .orb.speaking { animation: pulse .6s ease-in-out infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 50% { box-shadow: 0 0 80px color-mix(in srgb, var(--accent) 75%, transparent), inset 0 0 40px var(--accent); } }
+  @media (prefers-reduced-motion: reduce) { .orb, .orb::before, .orb::after { animation: none !important; } }
+  .status-line { margin-top: 26px; font-family: var(--mono); font-size: 12px; color: var(--muted); min-height: 18px; text-align: center; }
+  .interim { color: var(--accent); }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 10px; }
+  .pill { font: 11px var(--mono); padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .pill.on { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+  .pill.off { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+  .log { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px; min-height: 200px; }
+  .msg { max-width: 92%; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); }
+  .msg.user { align-self: flex-end; background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
+  .msg.bot { align-self: flex-start; background: var(--panel); }
+  .msg.bot h2 { margin-top: 10px; }
+  .msg p { margin: 4px 0; } .msg ul { margin: 4px 0; padding-left: 18px; }
+  .msg code { font-family: var(--mono); font-size: 13px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; }
+  .msg blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--warn); color: var(--muted); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { background: var(--panel); border: 1px solid var(--line); color: var(--text); padding: 6px 12px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 13px; }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  form.ask { display: flex; gap: 8px; }
+  form.ask input { flex: 1; background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 12px; padding: 12px 14px; font: inherit; outline: none; }
+  form.ask input:focus { border-color: var(--accent); }
+  .btn { background: var(--accent-2); color: #fff; border: 0; border-radius: 12px; padding: 0 16px; font: inherit; cursor: pointer; min-height: 44px; }
+  .btn.ghost { background: var(--panel); border: 1px solid var(--line); color: var(--text); }
+  .btn.ghost.active { border-color: var(--accent); color: var(--accent); }
+  .item { padding: 8px 0; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: flex-start; }
+  .item:last-child { border-bottom: 0; }
+  .item .meta { font-size: 12px; color: var(--muted); }
+  .item .title { overflow-wrap: anywhere; }
+  .check { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--muted); flex: none; margin-top: 2px; cursor: pointer; background: none; padding: 0; }
+  .check:hover { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 20%, transparent); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; margin-top: 8px; background: var(--muted); }
+  .dot.bad { background: var(--bad); } .dot.warn { background: var(--warn); } .dot.acc { background: var(--accent); }
+  .time { font-family: var(--mono); font-size: 12px; color: var(--accent); min-width: 54px; flex: none; margin-top: 2px; }
+  .empty { color: var(--muted); font-size: 13px; }
+  .toolbar { display: flex; gap: 8px; justify-content: center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <section class="card grow" aria-labelledby="h-tareas">
+      <h2 id="h-tareas">Pendientes <span class="count" id="n-tareas">–</span></h2>
+      <div id="tareas"><p class="empty">Cargando…</p></div>
+    </section>
+  </aside>
+
+  <main class="center">
+    <div class="hud">
+      <button class="orb" id="orb" aria-label="Hablar con Jarvis" title="Clic para hablar"></button>
+      <div class="status-line" id="status">Di “Hey Jarvis…” o toca el núcleo</div>
+      <div class="pills" id="pills"></div>
+    </div>
+    <div class="toolbar">
+      <button class="btn ghost" id="wake" type="button">👂 Wake word: off</button>
+      <button class="btn ghost" id="mute" type="button">🔊 Voz: on</button>
+    </div>
+    <div class="log" id="log" aria-live="polite"></div>
+    <div class="chips">
+      <button class="chip" data-q="Buenos días Jarvis">☀️ Briefing del día</button>
+      <button class="chip" data-q="¿Qué tengo pendiente?">📌 ¿Qué tengo pendiente?</button>
+      <button class="chip" data-q="¿Qué correos importantes tengo?">📬 Correo</button>
+      <button class="chip" data-q="¿Qué tengo en la agenda hoy?">📅 Agenda de hoy</button>
+      <button class="chip" data-q="Analiza mis finanzas">💰 Finanzas</button>
+      <button class="chip" data-q="¿Cómo van mis proyectos?">📊 Proyectos</button>
+    </div>
+    <form class="ask" id="ask">
+      <input id="q" autocomplete="off" placeholder="Pregúntale algo a Jarvis…  (ej. “recuérdame pagar la tarjeta mañana”)">
+      <button class="btn" type="submit">Enviar</button>
+    </form>
+  </main>
+
+  <aside class="side">
+    <section class="card" aria-labelledby="h-agenda">
+      <h2 id="h-agenda">Agenda <span class="count" id="n-agenda">–</span></h2>
+      <div id="agenda"><p class="empty">Cargando…</p></div>
+    </section>
+    <section class="card grow" aria-labelledby="h-correo">
+      <h2 id="h-correo">Correo sin leer <span class="count" id="n-correo">–</span></h2>
+      <div id="correo"><p class="empty">Cargando…</p></div>
+    </section>
+  </aside>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const TOKEN = new URLSearchParams(location.search).get("t") || "";
+const headers = { "Content-Type": "application/json", ...(TOKEN ? { "X-Jarvis-Token": TOKEN } : {}) };
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+let ESTADO = {}, historial = [], vozOn = store.get("jarvis.voz", true), wakeOn = false, ocupado = false;
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? { headers } : { method: "POST", headers, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+// ---------- markdown mínimo y seguro ----------
+function esc(s) { return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function inline(s) {
+  return esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/(^|\W)_([^_]+)_(?=\W|$)/g, "$1<em>$2</em>");
+}
+function md(text) {
+  const out = []; let list = false;
+  for (const raw of String(text || "").split("\n")) {
+    const l = raw.trimEnd();
+    const li = l.match(/^\s*[-*] (.*)$/);
+    if (li) { if (!list) { out.push("<ul>"); list = true; } out.push("<li>" + inline(li[1]) + "</li>"); continue; }
+    if (list) { out.push("</ul>"); list = false; }
+    let m;
+    if ((m = l.match(/^#{1,6} (.*)$/))) out.push("<h2>" + inline(m[1]) + "</h2>");
+    else if ((m = l.match(/^> ?(.*)$/))) out.push("<blockquote>" + inline(m[1]) + "</blockquote>");
+    else if (l === "---") out.push("<hr>");
+    else if (l) out.push("<p>" + inline(l) + "</p>");
+  }
+  if (list) out.push("</ul>");
+  return out.join("");
+}
+
+function addMsg(who, html) {
+  const d = document.createElement("div");
+  d.className = "msg " + who; d.innerHTML = html;
+  $("#log").appendChild(d); $("#log").scrollTop = $("#log").scrollHeight;
+  return d;
+}
+function setOrb(state, text) {
+  $("#orb").className = "orb " + (state || "");
+  if (text !== undefined) $("#status").innerHTML = text;
+}
+
+// ---------- paneles ----------
+function fmtHora(iso, todo) {
+  const d = new Date(iso); const hoy = new Date(); const man = new Date(); man.setDate(hoy.getDate() + 1);
+  const dia = d.toDateString() === hoy.toDateString() ? "Hoy" : d.toDateString() === man.toDateString() ? "Mañana" : d.toLocaleDateString("es", { weekday: "short", day: "numeric" });
+  return todo ? dia : dia + " " + d.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+}
+function pintar(datos) {
+  const t = datos.tareas || [];
+  $("#n-tareas").textContent = t.length;
+  $("#tareas").innerHTML = t.length ? "" : '<p class="empty">Nada pendiente. Di “recuérdame…” para anotar algo.</p>';
+  for (const x of t.slice(0, 40)) {
+    const el = document.createElement("div"); el.className = "item";
+    const color = x.vencida ? "var(--bad)" : x.hoy ? "var(--warn)" : "";
+    el.innerHTML = `<button class="check" title="Marcar como hecha" aria-label="Marcar como hecha"></button>
+      <div><div class="title" style="${color ? "color:" + color : ""}">${esc(x.texto)}</div>
+      <div class="meta">${esc(x.nota)}${x.fecha ? " · " + esc(x.fecha) : ""}${x.prioridad ? " · ⏫" : ""}</div></div>`;
+    el.querySelector(".check").onclick = async () => {
+      try { await api("/api/tarea/hecha", { nota: x.nota, original: x.original }); el.remove(); $("#n-tareas").textContent = --t.length; }
+      catch (e) { addMsg("bot", md("⚠️ " + e.message)); }
+    };
+    $("#tareas").appendChild(el);
+  }
+  const ev = datos.eventos || [];
+  $("#n-agenda").textContent = ESTADO.agenda ? ev.length : "–";
+  $("#agenda").innerHTML = !ESTADO.agenda ? '<p class="empty">Conecta tu calendario (ver JARVIS_TAB.md).</p>'
+    : ev.length ? ev.slice(0, 12).map((e) => `<div class="item"><span class="time">${esc(fmtHora(e.inicio, e.todo_el_dia))}</span><div><div class="title">${esc(e.titulo)}</div>${e.lugar ? `<div class="meta">${esc(e.lugar)}</div>` : ""}</div></div>`).join("")
+    : '<p class="empty">Agenda libre esta semana.</p>';
+  const c = (datos.correos || []).filter((x) => x.tipo !== "promo");
+  const promos = (datos.correos || []).length - c.length;
+  $("#n-correo").textContent = ESTADO.correo ? c.length : "–";
+  $("#correo").innerHTML = !ESTADO.correo ? '<p class="empty">Conecta tu correo (ver JARVIS_TAB.md).</p>'
+    : (c.length ? c.map((x) => `<div class="item"><span class="dot ${x.tipo === "importante" ? "bad" : "acc"}"></span><div><div class="title">${esc(x.asunto)}</div><div class="meta">${esc(x.de)}</div></div></div>`).join("") : '<p class="empty">Inbox bajo control.</p>')
+      + (promos ? `<p class="empty">+ ${promos} promos/newsletters ocultas</p>` : "");
+  for (const a of datos.avisos || []) addMsg("bot", md("> ⚠️ " + a));
+}
+async function refrescar() {
+  try { pintar(await api("/api/pendientes")); } catch (e) { $("#tareas").innerHTML = `<p class="empty">⚠️ ${esc(e.message)}</p>`; }
+}
+async function cargarEstado() {
+  try { ESTADO = await api("/api/estado"); } catch (e) { ESTADO = {}; }
+  const p = [["Modelo local", ESTADO.modelo], ["OpenJarvis", ESTADO.openjarvis], ["Vault", ESTADO.vault], ["Correo", ESTADO.correo], ["Agenda", ESTADO.agenda]];
+  $("#pills").innerHTML = p.map(([n, ok]) => `<span class="pill ${ok ? "on" : "off"}">${ok ? "●" : "○"} ${n}</span>`).join("");
+}
+
+// ---------- voz (TTS) ----------
+function hablar(texto) {
+  if (!vozOn || !("speechSynthesis" in window) || !texto) return Promise.resolve();
+  return new Promise((res) => {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(texto.replace(/[*_`#>]/g, ""));
+    const ingles = /\b(the|you|your|have|what|and)\b/i.test(texto) && !/[áéíóúñ¿¡]/i.test(texto);
+    u.lang = ingles ? "en-US" : "es-ES";
+    const voces = speechSynthesis.getVoices().filter((v) => v.lang.startsWith(u.lang.slice(0, 2)));
+    const pref = voces.find((v) => /Jorge|Diego|Juan|Daniel|Google español|Siri/i.test(v.name)) || voces[0];
+    if (pref) u.voice = pref;
+    u.rate = 1.05;
+    u.onstart = () => setOrb("speaking");
+    u.onend = u.onerror = () => { setOrb(wakeOn ? "listening" : "", wakeOn ? "Escuchando… di “Jarvis”" : "Listo"); res(); };
+    speechSynthesis.speak(u);
+  });
+}
+
+// ---------- preguntar ----------
+async function preguntar(texto) {
+  texto = texto.trim(); if (!texto || ocupado) return;
+  ocupado = true; addMsg("user", esc(texto)); setOrb("thinking", "Pensando…");
+  const pend = addMsg("bot", '<span class="interim">…</span>');
+  try {
+    const r = await api("/api/preguntar", { texto, historial });
+    pend.innerHTML = md(r.markdown || r.hablar);
+    historial.push({ role: "user", content: texto }, { role: "assistant", content: r.hablar || r.markdown });
+    historial = historial.slice(-12);
+    if (r.datos) pintar(r.datos); else if (r.refrescar) refrescar();
+    ocupado = false;
+    await hablar(r.hablar);
+  } catch (e) {
+    pend.innerHTML = md("⚠️ " + e.message); ocupado = false; setOrb("", "Error");
+  }
+}
+
+// ---------- reconocimiento de voz ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, esperandoOrden = false, timerOrden = null;
+const WAKE = () => new RegExp("\\b(hey|oye|ok|hola)?\\s*" + (ESTADO.wake_word || "jarvis"), "i");
+
+function iniciarRec(continuo) {
+  if (!SR) { addMsg("bot", md("Tu navegador no soporta reconocimiento de voz. Usa Chrome, Edge o Safari, o escribe abajo.")); return null; }
+  const r = new SR(); r.lang = "es-ES"; r.interimResults = true; r.continuous = continuo;
+  return r;
+}
+
+function escucharUnaVez() {
+  if (ESTADO.voz_local && window.MediaRecorder) return grabarLocal();
+  speechSynthesis && speechSynthesis.cancel();
+  const r = iniciarRec(false); if (!r) return;
+  if (wakeOn && rec) try { rec.abort(); } catch {}
+  setOrb("listening", "Te escucho…");
+  r.onresult = (e) => {
+    const res = e.results[e.results.length - 1];
+    $("#status").innerHTML = '<span class="interim">' + esc(res[0].transcript) + "</span>";
+    if (res.isFinal) preguntar(res[0].transcript);
+  };
+  r.onerror = () => setOrb("", "No te escuché bien");
+  r.onend = () => { if (!ocupado) setOrb("", "Listo"); if (wakeOn) setTimeout(arrancarWake, 400); };
+  r.start();
+}
+
+// Push-to-talk con Whisper local de OpenJarvis (el audio no sale de tu máquina)
+let grabador = null;
+async function grabarLocal() {
+  if (grabador) { grabador.stop(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const trozos = []; grabador = new MediaRecorder(stream);
+    grabador.ondataavailable = (e) => trozos.push(e.data);
+    grabador.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop()); grabador = null; setOrb("thinking", "Transcribiendo (local)…");
+      const fd = new FormData(); fd.append("file", new Blob(trozos, { type: "audio/webm" }), "voz.webm");
+      try {
+        const r = await fetch("/api/transcribir", { method: "POST", body: fd, headers: TOKEN ? { "X-Jarvis-Token": TOKEN } : {} });
+        const j = await r.json(); if (!r.ok) throw new Error(j.error);
+        preguntar(j.text || "");
+      } catch (e) { setOrb("", "⚠️ " + esc(e.message)); }
+    };
+    grabador.start(); setOrb("listening", "Grabando… toca de nuevo para enviar");
+  } catch (e) { setOrb("", "⚠️ Micrófono: " + esc(e.message)); }
+}
+
+function arrancarWake() {
+  if (!wakeOn || ocupado) { if (wakeOn) setTimeout(arrancarWake, 800); return; }
+  rec = iniciarRec(true); if (!rec) { wakeOn = false; return; }
+  setOrb("listening", "Escuchando… di “Jarvis”");
+  rec.onresult = (e) => {
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const frase = e.results[i][0].transcript; const final = e.results[i].isFinal;
+      if (esperandoOrden) {
+        $("#status").innerHTML = '<span class="interim">' + esc(frase) + "</span>";
+        if (final && frase.trim()) { esperandoOrden = false; clearTimeout(timerOrden); preguntar(frase); }
+        continue;
+      }
+      const m = frase.match(WAKE());
+      if (!m) continue;
+      const resto = frase.slice(m.index + m[0].length).replace(/^[\s,.:!?]+/, "");
+      if (final && resto.length > 2) { preguntar(resto); }
+      else if (final) {
+        esperandoOrden = true; setOrb("listening", "¿Sí? Te escucho…"); hablar("¿Sí?");
+        timerOrden = setTimeout(() => { esperandoOrden = false; setOrb("listening", "Escuchando… di “Jarvis”"); }, 8000);
+      } else { $("#status").innerHTML = '<span class="interim">' + esc(frase) + "</span>"; }
+    }
+  };
+  rec.onerror = (e) => { if (e.error === "not-allowed") { wakeOn = false; actualizarBotones(); setOrb("", "Permiso de micrófono denegado"); } };
+  rec.onend = () => { if (wakeOn) setTimeout(arrancarWake, 300); };
+  try { rec.start(); } catch {}
+}
+
+function actualizarBotones() {
+  $("#wake").textContent = "👂 Wake word: " + (wakeOn ? "on" : "off"); $("#wake").classList.toggle("active", wakeOn);
+  $("#mute").textContent = (vozOn ? "🔊" : "🔇") + " Voz: " + (vozOn ? "on" : "off"); $("#mute").classList.toggle("active", vozOn);
+}
+
+// ---------- eventos ----------
+$("#orb").onclick = () => escucharUnaVez();
+$("#wake").onclick = () => { wakeOn = !wakeOn; actualizarBotones(); if (wakeOn) arrancarWake(); else { try { rec && rec.abort(); } catch {} setOrb("", "Wake word apagado"); } };
+$("#mute").onclick = () => { vozOn = !vozOn; store.set("jarvis.voz", vozOn); if (!vozOn) speechSynthesis.cancel(); actualizarBotones(); };
+$("#ask").onsubmit = (e) => { e.preventDefault(); const v = $("#q").value; $("#q").value = ""; preguntar(v); };
+document.querySelectorAll(".chip").forEach((b) => (b.onclick = () => preguntar(b.dataset.q)));
+document.addEventListener("keydown", (e) => {
+  if (e.key === "/" && document.activeElement !== $("#q")) { e.preventDefault(); $("#q").focus(); }
+  if (e.key === "Escape") speechSynthesis.cancel();
+});
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => {};
+
+(async () => {
+  actualizarBotones();
+  await cargarEstado();
+  const nombre = ESTADO.usuario && ESTADO.usuario !== "tu usuario" ? ", " + ESTADO.usuario.split(" ")[0] : "";
+  addMsg("bot", md(`Hola${nombre}. Soy **Jarvis**. Pregúntame _“¿qué tengo pendiente?”_, pídeme el **briefing del día** o dime **“recuérdame…”**.` + (ESTADO.modelo || ESTADO.openjarvis ? "" : "\n> ⚠️ No hay modelo local corriendo: los paneles funcionan, pero para conversar arranca Ollama (`brew services start ollama`) u OpenJarvis (`jarvis serve`).")));
+  refrescar();
+  setInterval(refrescar, 5 * 60 * 1000);
+})();
+</script>
+</body>
+</html>

@@ -41,6 +41,7 @@ Cloud assistants have three problems for personal data: they cost money per toke
 - 💡 **Ideas agent** — scores your ideas by impact vs. effort and picks one to explore this week.
 - 📋 **Weekly briefing** — runs all agents, adds vault activity, and saves a Sunday briefing automatically (via macOS `launchd`).
 - 💬 **Local chat** — an interactive, streaming chat with Mistral-7B, right in your terminal.
+- 🎙️ **Jarvis tab with voice** — `python3 runners/web.py` opens a browser tab you can talk to: _“Hey Jarvis, what do I have pending?”_ pulls vault tasks, your calendar (iCal) and unread email (IMAP) into one spoken briefing; _“remind me to…”_ captures tasks. Optional bridge to Stanford's [OpenJarvis](https://github.com/open-jarvis/OpenJarvis). See [JARVIS_TAB.md](JARVIS_TAB.md).
 - 🛟 **Graceful fallbacks** — if the model is offline, agents degrade with a useful message instead of crashing.
 
 ## Quick start
